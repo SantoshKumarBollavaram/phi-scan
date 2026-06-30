@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>φ Scan — Facial Geometry Explorer</title>
+<style>
+  :root{
+    --magenta:#FF007F;
+    --magenta-active:#D60069;
+    --magenta-tint:#FFD6E9;
+    --aqua:#64E9EE;
+    --aqua-deep:#0FB6BC;
+    --ink:#1A1A1A;
+    --body:#46484C;
+    --muted:#838890;
+    --muted-soft:#AEB2B8;
+    --hairline:#E6E8EB;
+    --hairline-soft:#F0F1F3;
+    --canvas:#FFFFFF;
+    --surface-soft:#F7F8FA;
+    --surface-strong:#EFF1F4;
+    --on-accent:#0B0B0C;
+    --radius-lg:18px;
+    --radius-md:12px;
+    --radius-sm:8px;
+    --shadow-card: 0 0 0 1px rgba(0,0,0,0.02), 0 2px 6px rgba(0,0,0,0.05), 0 4px 10px rgba(0,0,0,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter', -apple-system, system-ui, 'Helvetica Neue', sans-serif;
+    color:var(--ink);
+    background:var(--canvas);
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+
+  /* ---------- NAV ---------- */
+  .nav{
+    height:72px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 24px;
+    border-bottom:1px solid var(--hairline);
+  }
+  .brand{
+    display:flex;align-items:center;gap:8px;
+    font-weight:700;font-size:19px;letter-spacing:-0.2px;
+  }
+  .brand .dot{
+    width:10px;height:10px;border-radius:50%;
+    background:linear-gradient(135deg,var(--magenta),var(--aqua));
+  }
+  .nav-meta{
+    font-size:13px;color:var(--muted);
+    display:flex;align-items:center;gap:6px;
+  }
+  .nav-meta .pulse{
+    width:7px;height:7px;border-radius:50%;background:var(--aqua-deep);
+    box-shadow:0 0 0 0 rgba(15,182,188,.6);
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(15,182,188,.45);}
+    70%{box-shadow:0 0 0 8px rgba(15,182,188,0);}
+    100%{box-shadow:0 0 0 0 rgba(15,182,188,0);}
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{
+    max-width:1080px;margin:0 auto;
+    padding:56px 24px 16px;
+    text-align:center;
+  }
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:12px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;
+    color:var(--magenta);
+    background:var(--magenta-tint);
+    padding:6px 14px;border-radius:9999px;
+    margin-bottom:18px;
+  }
+  h1{
+    font-size:clamp(28px,4.4vw,44px);
+    font-weight:700;letter-spacing:-0.6px;line-height:1.12;
+    margin:0 0 14px;
+  }
+  h1 .accent{
+    background:linear-gradient(100deg,var(--magenta),var(--aqua-deep));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lede{
+    font-size:16px;line-height:1.55;color:var(--body);
+    max-width:560px;margin:0 auto 8px;
+  }
+  .disclaimer{
+    font-size:13px;color:var(--muted);
+    max-width:560px;margin:14px auto 0;
+    padding:10px 14px;
+    background:var(--surface-soft);
+    border:1px solid var(--hairline);
+    border-radius:var(--radius-sm);
+  }
+
+  /* ---------- SCAN CARD ---------- */
+  .scan-wrap{
+    max-width:560px;margin:36px auto 0;padding:0 24px;
+  }
+  .mode-toggle{
+    display:flex;background:var(--surface-strong);
+    border-radius:9999px;padding:4px;margin-bottom:16px;
+  }
+  .mode-btn{
+    flex:1;border:none;background:transparent;cursor:pointer;
+    padding:10px 0;border-radius:9999px;
+    font-size:14px;font-weight:600;color:var(--muted);
+    transition:background .15s, color .15s;
+  }
+  .mode-btn.active{
+    background:var(--canvas);color:var(--ink);
+    box-shadow:var(--shadow-card);
+  }
+
+  .scan-card{
+    background:var(--canvas);
+    border:1px solid var(--hairline);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-card);
+    overflow:hidden;
+  }
+  .stage{
+    position:relative;
+    width:100%;aspect-ratio:4/3;
+    background:#0d0d0f;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .stage video, .stage canvas, .stage img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  }
+  .stage-empty{
+    color:#7d7d82;font-size:14px;text-align:center;padding:24px;
+    display:flex;flex-direction:column;align-items:center;gap:10px;
+  }
+  .stage-empty svg{opacity:.6;}
+
+  .scan-controls{
+    display:flex;gap:10px;padding:16px;border-top:1px solid var(--hairline);
+  }
+  .btn{
+    border:none;cursor:pointer;border-radius:var(--radius-sm);
+    font-size:14px;font-weight:600;
+    padding:13px 18px;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    transition:background .15s, transform .05s;
+  }
+  .btn:active{transform:scale(0.98);}
+  .btn-primary{
+    background:var(--magenta);color:#fff;flex:1;
+  }
+  .btn-primary:hover{background:var(--magenta-active);}
+  .btn-primary:disabled{background:var(--magenta-tint);color:#fff;cursor:not-allowed;}
+  .btn-secondary{
+    background:var(--canvas);color:var(--ink);
+    border:1px solid var(--hairline-soft);
+    box-shadow:0 0 0 1px var(--hairline) inset;
+  }
+  .btn-secondary:hover{background:var(--surface-soft);}
+  input[type=file]{display:none;}
+
+  .live-tag{
+    position:absolute;top:12px;left:12px;
+    background:rgba(0,0,0,.55);color:#fff;
+    font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+    padding:5px 10px;border-radius:9999px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .live-tag .r{width:6px;height:6px;border-radius:50%;background:var(--magenta);}
+
+  /* ---------- RESULTS ---------- */
+  .results{
+    max-width:560px;margin:32px auto 0;padding:0 24px 64px;
+    display:none;
+  }
+  .results.show{display:block;}
+
+  .score-card{
+    text-align:center;
+    background:var(--ink);
+    color:#fff;
+    border-radius:var(--radius-lg);
+    padding:36px 24px 30px;
+    margin-bottom:20px;
+    position:relative;
+    overflow:hidden;
+  }
+  .score-card::before{
+    content:"";position:absolute;inset:-40%;
+    background:radial-gradient(circle at 30% 20%, rgba(255,0,127,.25), transparent 60%),
+               radial-gradient(circle at 75% 80%, rgba(100,233,238,.22), transparent 55%);
+  }
+  .score-eyebrow{
+    position:relative;font-size:12px;font-weight:700;letter-spacing:.5px;
+    text-transform:uppercase;color:var(--aqua);margin-bottom:6px;
+  }
+  .score-number{
+    position:relative;
+    font-size:64px;font-weight:700;letter-spacing:-1.5px;line-height:1;
+    margin:6px 0 8px;
+  }
+  .score-number .of-phi{
+    font-size:20px;font-weight:500;color:#d8d8db;letter-spacing:0;
+  }
+  .score-sub{
+    position:relative;font-size:13px;color:#c8c8cd;max-width:380px;margin:0 auto;
+  }
+
+  .ratio-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:12px;
+  }
+  .ratio-card{
+    background:var(--canvas);
+    border:1px solid var(--hairline);
+    border-radius:var(--radius-md);
+    padding:16px;
+  }
+  .ratio-label{
+    font-size:12px;color:var(--muted);font-weight:600;margin-bottom:8px;
+  }
+  .ratio-value{
+    font-size:22px;font-weight:700;letter-spacing:-0.3px;margin-bottom:8px;
+  }
+  .ratio-bar-track{
+    height:6px;border-radius:9999px;background:var(--surface-strong);overflow:hidden;
+  }
+  .ratio-bar-fill{
+    height:100%;border-radius:9999px;
+    background:linear-gradient(90deg,var(--aqua-deep),var(--magenta));
+  }
+  .ratio-delta{
+    font-size:11px;color:var(--muted-soft);margin-top:6px;
+  }
+
+  .usage-strip{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    margin-top:28px;padding:14px;
+    background:var(--surface-soft);
+    border:1px solid var(--hairline);
+    border-radius:var(--radius-sm);
+    font-size:13px;color:var(--muted);
+  }
+  .usage-strip strong{color:var(--ink);}
+
+  /* ---------- FOOTER ---------- */
+  footer{
+    border-top:1px solid var(--hairline);
+    padding:32px 24px 40px;
+    text-align:center;
+  }
+  footer p{
+    font-size:12px;color:var(--muted-soft);
+    max-width:520px;margin:0 auto;line-height:1.6;
+  }
+
+  @media (max-width:480px){
+    .ratio-grid{grid-template-columns:1fr 1fr;}
+    .score-number{font-size:52px;}
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand"><span class="dot"></span>φ Scan</div>
+</nav>
+
+<section class="hero">
+  <span class="eyebrow">Geometry experiment, not a verdict</span>
+  <h1>How close is a face to <span class="accent">φ (1.618)</span>?</h1>
+  <p class="lede">Scan a live frame or upload a photo. We measure four classic facial ratios and compare each to the golden ratio — purely as a geometry exercise.</p>
+  <p class="disclaimer">No scientific link between φ-proximity and attractiveness has been established. Nothing is uploaded or stored — measurements stay in your browser unless you choose otherwise below.</p>
+</section>
+
+<div class="scan-wrap">
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="tabCamera">Use camera</button>
+    <button class="mode-btn" id="tabUpload">Upload a photo</button>
+  </div>
+
+  <div class="scan-card">
+    <div class="stage" id="stage">
+      <div class="stage-empty" id="stageEmpty">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7d7d82" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Start the camera or upload a photo to begin</span>
+      </div>
+      <video id="video" autoplay playsinline muted style="display:none;"></video>
+      <canvas id="overlay" style="display:none;"></canvas>
+      <img id="photo" style="display:none;">
+      <div class="live-tag" id="liveTag" style="display:none;"><span class="r"></span>Live</div>
+    </div>
+    <div class="scan-controls" id="cameraControls">
+      <button class="btn btn-primary" id="startCam">Start camera</button>
+      <button class="btn btn-secondary" id="switchCam" style="display:none;">Switch</button>
+      <button class="btn btn-secondary" id="freezeCam" style="display:none;">Freeze</button>
+    </div>
+    <div class="scan-controls" id="uploadControls" style="display:none;">
+      <label class="btn btn-primary" style="flex:1;" for="fileInput">Choose a photo</label>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+  </div>
+</div>
+
+<div class="results" id="results">
+  <div class="score-card">
+    <div class="score-eyebrow">φ Alignment score</div>
+    <div class="score-number"><span id="scoreNum">—</span><span class="of-phi"> / 100</span></div>
+    <div class="score-sub">Average closeness of all four measured ratios to φ (1.618). Higher just means "more golden-ratio-like," not "more attractive."</div>
+  </div>
+
+  <div class="ratio-grid" id="ratioGrid"></div>
+
+  <div class="usage-strip" id="usageStrip">
+    <span><strong id="usageCount">—</strong> scans logged anonymously so far</span>
+  </div>
+</div>
+
+<footer>
+  <p>φ Scan computes everything locally using on-device face landmark detection. If usage logging is enabled, only the four anonymous numeric ratios are recorded — never your photo, name, or any identifying data, and there is no leaderboard or face comparison between users.</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script>
+/* =========================================================
+   SUPABASE CONFIG — fill these in with your own project's
+   values (Project Settings -> API). The anon key is safe to
+   expose client-side; row-level security policies govern
+   what it's allowed to do. Leave blank to disable logging.
+   ========================================================= */
+const SUPABASE_URL = "";       // e.g. "https://xxxx.supabase.co"
+const SUPABASE_ANON_KEY = "";  // e.g. "eyJhbGciOi..."
+
+/* Suggested table (run in Supabase SQL editor):
+
+create table scans (
+  id bigint generated always as identity primary key,
+  face_length_width numeric,
+  mouth_nose numeric,
+  eye_nose numeric,
+  face_eye_span numeric,
+  phi_score numeric,
+  created_at timestamptz default now()
+);
+
+alter table scans enable row level security;
+
+create policy "anyone can insert" on scans
+  for insert to anon with check (true);
+
+create policy "anyone can read count" on scans
+  for select to anon using (true);
+
+*/
+
+const PHI = 1.618;
+const LANDMARKS = {
+  faceTop:10, faceBottom:152, faceLeftCheek:234, faceRightCheek:454,
+  mouthLeft:61, mouthRight:291,
+  noseLeft:129, noseRight:358,
+  eyeInnerL:133, eyeInnerR:362,
+  eyeOuterL:33, eyeOuterR:263
+};
+
+let faceMesh, camera, currentStream, usingFrontCamera = true;
+let mode = 'camera';
+let frozen = false;
+
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const ctx = overlay.getContext('2d');
+const photoImg = document.getElementById('photo');
+const stageEmpty = document.getElementById('stageEmpty');
+const liveTag = document.getElementById('liveTag');
+
+const tabCamera = document.getElementById('tabCamera');
+const tabUpload = document.getElementById('tabUpload');
+const cameraControls = document.getElementById('cameraControls');
+const uploadControls = document.getElementById('uploadControls');
+const startCamBtn = document.getElementById('startCam');
+const switchCamBtn = document.getElementById('switchCam');
+const freezeCamBtn = document.getElementById('freezeCam');
+const fileInput = document.getElementById('fileInput');
+
+const results = document.getElementById('results');
+const scoreNum = document.getElementById('scoreNum');
+const ratioGrid = document.getElementById('ratioGrid');
+const usageStrip = document.getElementById('usageStrip');
+const usageCount = document.getElementById('usageCount');
+
+function setMode(next){
+  mode = next;
+  tabCamera.classList.toggle('active', mode==='camera');
+  tabUpload.classList.toggle('active', mode==='upload');
+  cameraControls.style.display = mode==='camera' ? 'flex' : 'none';
+  uploadControls.style.display = mode==='upload' ? 'flex' : 'none';
+  stopCamera();
+  resetStage();
+}
+tabCamera.addEventListener('click', ()=>setMode('camera'));
+tabUpload.addEventListener('click', ()=>setMode('upload'));
+
+function resetStage(){
+  video.style.display='none';
+  overlay.style.display='none';
+  photoImg.style.display='none';
+  liveTag.style.display='none';
+  stageEmpty.style.display='flex';
+  switchCamBtn.style.display='none';
+  freezeCamBtn.style.display='none';
+  startCamBtn.style.display='inline-flex';
+  startCamBtn.textContent='Start camera';
+  results.classList.remove('show');
+  frozen = false;
+}
+
+function initFaceMesh(){
+  if(faceMesh) return faceMesh;
+  faceMesh = new FaceMesh({locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+  faceMesh.setOptions({maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.5, minTrackingConfidence:0.5});
+  faceMesh.onResults(onResults);
+  return faceMesh;
+}
+
+async function startCamera(){
+  if(!window.isSecureContext){
+    stageEmpty.style.display='flex';
+    stageEmpty.querySelector('span').textContent = "Camera access needs HTTPS (or localhost). Once this is deployed on Vercel it'll be https:// automatically and this will work — opening the raw .html file directly won't allow camera access.";
+    return;
+  }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    stageEmpty.style.display='flex';
+    stageEmpty.querySelector('span').textContent = "This browser doesn't support camera access. Try Chrome, Safari, or Edge, or use Upload a photo instead.";
+    return;
+  }
+  try{ initFaceMesh(); }catch(e){
+    stageEmpty.style.display='flex';
+    stageEmpty.querySelector('span').textContent = "Face detection failed to load (check your internet connection) — try Upload a photo instead.";
+    console.error(e);
+    return;
+  }
+  stageEmpty.style.display='none';
+  video.style.display='block';
+  overlay.style.display='block';
+  liveTag.style.display='flex';
+  startCamBtn.style.display='none';
+  switchCamBtn.style.display='inline-flex';
+  freezeCamBtn.style.display='inline-flex';
+  freezeCamBtn.textContent='Freeze';
+  frozen = false;
+
+  try{
+    currentStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: usingFrontCamera ? 'user' : 'environment' }
+    });
+  }catch(e){
+    stageEmpty.style.display='flex';
+    stageEmpty.querySelector('span').textContent = "Couldn't access the camera — check permissions, or use Upload a photo instead.";
+    video.style.display='none'; overlay.style.display='none'; liveTag.style.display='none';
+    startCamBtn.style.display='inline-flex'; switchCamBtn.style.display='none'; freezeCamBtn.style.display='none';
+    return;
+  }
+  video.srcObject = currentStream;
+  await video.play();
+
+  camera = new Camera(video, {
+    onFrame: async ()=>{ if(!frozen) await faceMesh.send({image:video}); },
+    width: 640, height: 480
+  });
+  camera.start();
+}
+
+function stopCamera(){
+  if(camera){ camera.stop(); camera=null; }
+  if(currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream=null; }
+}
+
+startCamBtn.addEventListener('click', startCamera);
+switchCamBtn.addEventListener('click', ()=>{ usingFrontCamera=!usingFrontCamera; stopCamera(); startCamera(); });
+freezeCamBtn.addEventListener('click', ()=>{
+  frozen = !frozen;
+  freezeCamBtn.textContent = frozen ? 'Resume' : 'Freeze';
+});
+
+fileInput.addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  photoImg.onload = async ()=>{
+    stageEmpty.style.display='none';
+    photoImg.style.display='block';
+    initFaceMesh();
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = photoImg.naturalWidth;
+    tmpCanvas.height = photoImg.naturalHeight;
+    tmpCanvas.getContext('2d').drawImage(photoImg,0,0);
+    await faceMesh.send({image: tmpCanvas});
+  };
+  photoImg.src = url;
+});
+
+function onResults(res){
+  const stage = document.getElementById('stage');
+  const w = stage.clientWidth, h = stage.clientHeight;
+  overlay.width = w; overlay.height = h;
+  if(mode==='camera'){ ctx.clearRect(0,0,w,h); }
+
+  if(!res.multiFaceLandmarks || res.multiFaceLandmarks.length===0) return;
+  const lm = res.multiFaceLandmarks[0];
+  const sourceW = mode==='camera' ? video.videoWidth : photoImg.naturalWidth;
+  const sourceH = mode==='camera' ? video.videoHeight : photoImg.naturalHeight;
+
+  const ratios = computeRatios(lm);
+  renderResults(ratios);
+
+  if(mode==='camera'){
+    drawLandmarkLines(lm, w, h);
+  }
+}
+
+function dist(a,b){
+  return Math.hypot(a.x-b.x, a.y-b.y);
+}
+
+function computeRatios(lm){
+  const faceLenWid = dist(lm[LANDMARKS.faceTop], lm[LANDMARKS.faceBottom]) / dist(lm[LANDMARKS.faceLeftCheek], lm[LANDMARKS.faceRightCheek]);
+  const mouthNose = dist(lm[LANDMARKS.mouthLeft], lm[LANDMARKS.mouthRight]) / dist(lm[LANDMARKS.noseLeft], lm[LANDMARKS.noseRight]);
+  const eyeNose = dist(lm[LANDMARKS.eyeInnerL], lm[LANDMARKS.eyeInnerR]) / dist(lm[LANDMARKS.noseLeft], lm[LANDMARKS.noseRight]);
+  const faceEyeSpan = dist(lm[LANDMARKS.faceLeftCheek], lm[LANDMARKS.faceRightCheek]) / dist(lm[LANDMARKS.eyeOuterL], lm[LANDMARKS.eyeOuterR]);
+  return {
+    faceLenWid: round3(faceLenWid),
+    mouthNose: round3(mouthNose),
+    eyeNose: round3(eyeNose),
+    faceEyeSpan: round3(faceEyeSpan)
+  };
+}
+function round3(n){ return Math.round(n*1000)/1000; }
+
+function closeness(value){
+  // 100 = exactly phi, decays with distance
+  const dev = Math.abs(value - PHI) / PHI;
+  return Math.max(0, Math.round(100 * (1 - dev)));
+}
+
+let lastLoggedAt = 0;
+function renderResults(ratios){
+  const items = [
+    {label:'Face length ÷ width', value:ratios.faceLenWid},
+    {label:'Mouth width ÷ nose width', value:ratios.mouthNose},
+    {label:'Eye span ÷ nose width', value:ratios.eyeNose},
+    {label:'Face width ÷ eye span', value:ratios.faceEyeSpan}
+  ];
+  const scores = items.map(i=>closeness(i.value));
+  const overall = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+
+  scoreNum.textContent = overall;
+  ratioGrid.innerHTML = items.map((it,i)=>{
+    const s = scores[i];
+    const delta = (it.value - PHI).toFixed(3);
+    const sign = it.value >= PHI ? '+' : '';
+    return `<div class="ratio-card">
+      <div class="ratio-label">${it.label}</div>
+      <div class="ratio-value">${it.value.toFixed(3)}</div>
+      <div class="ratio-bar-track"><div class="ratio-bar-fill" style="width:${s}%"></div></div>
+      <div class="ratio-delta">${sign}${delta} vs φ · ${s}% close</div>
+    </div>`;
+  }).join('');
+  results.classList.add('show');
+
+  // Log at most once every 4s per session to avoid spamming inserts while live-scanning
+  const now = Date.now();
+  if(now - lastLoggedAt > 4000){
+    lastLoggedAt = now;
+    logScanAnonymously(ratios, overall);
+  }
+}
+
+function drawLandmarkLines(lm, w, h){
+  ctx.clearRect(0,0,w,h);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(255,0,127,0.85)';
+  const pairs = [
+    [LANDMARKS.faceTop, LANDMARKS.faceBottom],
+    [LANDMARKS.faceLeftCheek, LANDMARKS.faceRightCheek],
+    [LANDMARKS.mouthLeft, LANDMARKS.mouthRight],
+    [LANDMARKS.noseLeft, LANDMARKS.noseRight]
+  ];
+  pairs.forEach(([a,b])=>{
+    ctx.beginPath();
+    ctx.moveTo(lm[a].x*w, lm[a].y*h);
+    ctx.lineTo(lm[b].x*w, lm[b].y*h);
+    ctx.stroke();
+  });
+  ctx.strokeStyle = 'rgba(100,233,238,0.85)';
+  const pairs2 = [
+    [LANDMARKS.eyeInnerL, LANDMARKS.eyeInnerR],
+    [LANDMARKS.eyeOuterL, LANDMARKS.eyeOuterR]
+  ];
+  pairs2.forEach(([a,b])=>{
+    ctx.beginPath();
+    ctx.moveTo(lm[a].x*w, lm[a].y*h);
+    ctx.lineTo(lm[b].x*w, lm[b].y*h);
+    ctx.stroke();
+  });
+}
+
+async function logScanAnonymously(ratios, overall){
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+  try{
+    await fetch(`${SUPABASE_URL}/rest/v1/scans`, {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Prefer':'return=minimum'
+      },
+      body: JSON.stringify({
+        face_length_width: ratios.faceLenWid,
+        mouth_nose: ratios.mouthNose,
+        eye_nose: ratios.eyeNose,
+        face_eye_span: ratios.faceEyeSpan,
+        phi_score: overall
+      })
+    });
+    refreshUsageCount();
+  }catch(e){ console.warn('Scan logging failed', e); }
+}
+
+async function refreshUsageCount(){
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY){
+    usageStrip.style.display='none';
+    return;
+  }
+  try{
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/scans?select=id`, {
+      headers:{
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Prefer':'count=exact',
+        'Range':'0-0'
+      }
+    });
+    const range = res.headers.get('content-range'); // "0-0/123"
+    if(range){
+      const total = range.split('/')[1];
+      usageCount.textContent = total;
+    }
+  }catch(e){ console.warn('Usage count fetch failed', e); }
+}
+
+resetStage();
+refreshUsageCount();
+</script>
+</body>
+</html>
